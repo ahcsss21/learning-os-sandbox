@@ -1,51 +1,41 @@
 # Learning OS SQL sandbox service
 
-This service runs PGlite outside Supabase Edge Functions. It accepts authenticated internal requests from Edge Functions, starts a fresh worker process for each database job, and serializes jobs so only one PGlite instance consumes memory at a time. The worker exits after every job to release its WebAssembly allocation.
+The sandbox connects to Supabase Postgres with a restricted manager login. For each operation it opens a transaction, creates a unique temporary schema, loads only validated table DDL and literal seed rows, grants a no-login reader role access to that schema, runs learner SELECT statements as that reader role, and rolls back the transaction. No PGlite/WASM database is loaded, and learner SQL never executes as the manager.
+
+The SQL parser intentionally supports a safe MVP subset: ordinary unqualified `CREATE TABLE`, literal `INSERT ... VALUES`, and one read-only `SELECT` or `WITH` query. Writes, qualified table/function references, dynamic DDL, expression-based seed inserts, known side-effect functions, multi-statements, and data-modifying CTEs are rejected.
+
+## Run tests
+
+From the repository root:
+
+```powershell
+npm test --prefix sandbox-service
+```
+
+The tests cover allowed DDL/seeds/queries and rejected cross-schema access, writes, side-effect functions, and multi-statements.
+
+## One-time Supabase setup
+
+1. In Supabase SQL Editor, run the contents of `supabase/migrations/003_learning_os_sandbox_roles.sql`. It creates `learning_os_sandbox_reader` and `learning_os_sandbox_manager`; the manager can create schemas but has no grants on app tables. The reader is granted access only to the temporary schema during a transaction.
+2. Set a strong password for `learning_os_sandbox_manager` in SQL Editor, for example with `ALTER ROLE learning_os_sandbox_manager WITH PASSWORD 'replace-with-a-strong-password';`. Do not use the `postgres` password. Keep the password private and out of chat/source files; do not save the query as a shared snippet.
+3. In Supabase **Connect**, choose the **Session pooler** connection string. Use the manager role username and its password. Store the completed URI as a Render environment variable named `SANDBOX_DATABASE_URL`. It must remain server-side. Use TLS (`sslmode=require`).
+4. Keep `SANDBOX_SERVICE_TOKEN` configured in Render and the matching Supabase Function secret. Keep `SANDBOX_SERVICE_URL` pointed at the Render service.
+
+The migration targets Supabase's default `postgres` database. Confirm the selected project/database before applying it. Do not grant the manager role access to app tables or the answer-key table.
+
+## Deploy the service
+
+The Render service should build the Dockerfile at `sandbox-service/Dockerfile` with the repository root as its build context. Add or update the `SANDBOX_DATABASE_URL` environment variable in Render, then deploy the new service code. The Node/Postgres worker uses far less memory than PGlite, so the service should fit a 512 MB instance; free-instance cold starts may still delay initial requests.
+
+Check `https://YOUR-RENDER-URL/health` for service health. This does not test database credentials. The first authenticated schema validation or query tests the Postgres connection and restricted role.
 
 ## Local run
 
-From the repository root in PowerShell:
+Set `SANDBOX_DATABASE_URL` and `SANDBOX_SERVICE_TOKEN` in the local PowerShell session, then run:
 
 ```powershell
-$bytes = New-Object byte[] 32
-[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
-$env:SANDBOX_SERVICE_TOKEN = [Convert]::ToBase64String($bytes)
 $env:PORT = '8080'
 npm run sandbox:dev
 ```
 
-The local service health endpoint is `http://127.0.0.1:8080/health`. The token must also be configured as `SANDBOX_SERVICE_TOKEN` in Supabase Edge Function secrets. Hosted Supabase Functions cannot call a service running only on your computer; deploy this Dockerfile to a reachable private service first and set its HTTPS URL as `SANDBOX_SERVICE_URL` in Supabase secrets.
-
-## Container deployment
-
-Build from the repository root so the Dockerfile context includes `sandbox-service/`:
-
-```powershell
-docker build -f sandbox-service/Dockerfile -t learning-os-sandbox .
-docker run --rm -p 8080:8080 -e SANDBOX_SERVICE_TOKEN="your-random-token" learning-os-sandbox
-```
-
-Allocate at least 1 GiB of RAM to the service. The parent queues jobs and each worker may use several hundred MiB. Keep the service private to Supabase Functions where possible; the bearer token is required regardless.
-
-Configure these Supabase Function secrets after deploying the service:
-
-- `SANDBOX_SERVICE_URL`: its HTTPS origin, without a route suffix
-- `SANDBOX_SERVICE_TOKEN`: the same random token configured on the service
-
-Set them from the repository root in PowerShell:
-
-```powershell
-npx supabase secrets set SANDBOX_SERVICE_URL="https://your-sandbox-host" SANDBOX_SERVICE_TOKEN="same-random-token"
-```
-
-Then deploy all functions that import the shared platform module:
-
-```powershell
-npx supabase functions deploy save-schema
-npx supabase functions deploy generate-schema
-npx supabase functions deploy generate-questions
-npx supabase functions deploy generate-hint
-npx supabase functions deploy run-query
-```
-
-Never expose this token in frontend environment variables or send it in chat. Do not deploy the updated Edge Functions until the sandbox service is reachable over HTTPS and both secrets are set.
+Do not print, paste into chat, or commit either secret. A hosted Supabase Edge Function cannot access a service running only on your computer unless an HTTPS tunnel is configured.
