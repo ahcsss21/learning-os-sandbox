@@ -18,8 +18,15 @@ The tests cover allowed DDL/seeds/queries and rejected cross-schema access, writ
 
 1. In Supabase SQL Editor, run the contents of `supabase/migrations/003_learning_os_sandbox_roles.sql`. It creates `learning_os_sandbox_reader` and `learning_os_sandbox_manager`; the manager can create schemas but has no grants on app tables. The reader is granted access only to the temporary schema during a transaction.
 2. Set a strong password for `learning_os_sandbox_manager` in SQL Editor, for example with `ALTER ROLE learning_os_sandbox_manager WITH PASSWORD 'replace-with-a-strong-password';`. Do not use the `postgres` password. Keep the password private and out of chat/source files; do not save the query as a shared snippet.
-3. In Supabase **Connect**, choose the **Session pooler** connection string. Use the manager role username and its password. Store the completed URI as a Render environment variable named `SANDBOX_DATABASE_URL`. It must remain server-side. Use TLS (`sslmode=require`).
-4. Keep `SANDBOX_SERVICE_TOKEN` configured in Render and the matching Supabase Function secret. Keep `SANDBOX_SERVICE_URL` pointed at the Render service.
+3. Download the project's root certificate from Supabase **Database Settings → SSL Configuration**. Convert the certificate file to base64 in PowerShell and store it in Render as `SANDBOX_DATABASE_CA_CERT_BASE64`:
+
+	```powershell
+	[Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\path\to\the-downloaded-root-certificate.crt')) | Set-Clipboard
+	```
+
+	Paste the clipboard value into the Render environment variable. The worker uses this CA with certificate verification enabled; do not disable TLS verification.
+4. In Supabase **Connect**, choose the **Session pooler** connection string. Use the manager role username and its password. Store the completed URI as a Render environment variable named `SANDBOX_DATABASE_URL`. It must remain server-side. Use TLS (`sslmode=require`).
+5. Keep `SANDBOX_SERVICE_TOKEN` configured in Render and the matching Supabase Function secret. Keep `SANDBOX_SERVICE_URL` pointed at the Render service.
 
 The migration targets Supabase's default `postgres` database. Confirm the selected project/database before applying it. Do not grant the manager role access to app tables or the answer-key table.
 

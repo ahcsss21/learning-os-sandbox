@@ -47,12 +47,16 @@ async function main(payload) {
 
   const connectionString = process.env.SANDBOX_DATABASE_URL;
   if (!connectionString) throw new Error('Set SANDBOX_DATABASE_URL to the restricted Supabase sandbox-manager connection string.');
+  const caBase64 = process.env.SANDBOX_DATABASE_CA_CERT_BASE64;
+  if (!caBase64) throw new Error('Set SANDBOX_DATABASE_CA_CERT_BASE64 to the Supabase database root CA certificate.');
+  const ca = Buffer.from(caBase64, 'base64').toString('utf8');
+  if (!ca.includes('-----BEGIN CERTIFICATE-----') || !ca.includes('-----END CERTIFICATE-----')) throw new Error('SANDBOX_DATABASE_CA_CERT_BASE64 is not a valid PEM certificate.');
   const readerRole = process.env.SANDBOX_READER_ROLE || 'learning_os_sandbox_reader';
   if (!/^[a-z_][a-z0-9_]{0,62}$/i.test(readerRole)) throw new Error('SANDBOX_READER_ROLE must be a valid PostgreSQL role name.');
 
   const client = new Client({
     connectionString,
-    ssl: { rejectUnauthorized: true },
+    ssl: { rejectUnauthorized: true, ca },
     connectionTimeoutMillis: 10_000,
     statement_timeout: 5_000,
     query_timeout: 8_000,
