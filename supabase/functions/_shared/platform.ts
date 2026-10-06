@@ -82,6 +82,22 @@ export function parseJsonFromModel(text: string) {
   }
 }
 
+function providerRetryDelayMs(response: Response, detail: string, retryNumber: number) {
+  const retryAfter = response.headers.get('retry-after');
+  let delayMs = retryAfter && Number.isFinite(Number(retryAfter))
+    ? Number(retryAfter) * 1000
+    : retryAfter ? Date.parse(retryAfter) - Date.now() : NaN;
+  if (!Number.isFinite(delayMs) || delayMs <= 0) {
+    try {
+      const message = JSON.parse(detail).error?.message ?? '';
+      const match = String(message).match(/try again in\s+([\d.]+)\s*s/i);
+      delayMs = match ? Number(match[1]) * 1000 : NaN;
+    } catch { /* Use bounded exponential backoff when the provider gives no retry hint. */ }
+  }
+  if (!Number.isFinite(delayMs) || delayMs <= 0) delayMs = Math.min(1000 * 2 ** retryNumber, 4000);
+  return Math.max(250, Math.min(delayMs, 30_000));
+}
+
 export async function askModel(system: string, user: string, temperature = 0.25, maxCompletionTokens?: number) {
   const apiKey = Deno.env.get('LLM_API_KEY');
   if (!apiKey) throw new Error('Question/hint generation is not configured yet. A tester must set the LLM_API_KEY Supabase Function secret.');
@@ -90,23 +106,34 @@ export async function askModel(system: string, user: string, temperature = 0.25,
   let response: Response | undefined;
   for (let attempt = 0; attempt < 2; attempt++) {
     const retryingWithoutJsonMode = attempt === 1;
-    const completionTokens = maxCompletionTokens
-      ? retryingWithoutJsonMode ? Math.min(maxCompletionTokens * 2, 8000) : maxCompletionTokens
-      : undefined;
-    response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        temperature: retryingWithoutJsonMode ? Math.min(temperature, 0.1) : temperature,
-        ...(completionTokens ? { max_completion_tokens: completionTokens } : {}),
-        ...(!retryingWithoutJsonMode ? { response_format: { type: 'json_object' } } : {}),
-        messages: [
-          { role: 'system', content: retryingWithoutJsonMode ? `${system}\n\nOutput one valid JSON object only. Do not use markdown fences, comments, or trailing commas.` : system },
-          { role: 'user', content: user },
-        ],
-      }),
+    const requestBody = JSON.stringify({
+      model,
+      temperature: retryingWithoutJsonMode ? Math.min(temperature, 0.1) : temperature,
+      ...(maxCompletionTokens ? { max_completion_tokens: maxCompletionTokens } : {}),
+      ...(!retryingWithoutJsonMode ? { response_format: { type: 'json_object' } } : {}),
+      messages: [
+        { role: 'system', content: retryingWithoutJsonMode ? `${system}\n\nOutput one valid JSON object only. Do not use markdown fences, comments, or trailing commas.` : system },
+        { role: 'user', content: user },
+      ],
     });
+    let rateLimitRetries = 0;
+    while (true) {
+      response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: requestBody,
+      });
+      if (response.status !== 429 || rateLimitRetries >= 2) break;
+      const detail = await response.text();
+      const delayMs = providerRetryDelayMs(response, detail, rateLimitRetries);
+      console.warn('LLM provider rate limited the request; retrying after the advised delay.', {
+        model,
+        retry: rateLimitRetries + 1,
+        delayMs,
+      });
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      rateLimitRetries++;
+    }
     if (response.ok) {
       const payload = await response.json();
       const choice = payload.choices?.[0];
@@ -145,12 +172,13 @@ export async function askModel(system: string, user: string, temperature = 0.25,
 
     const detail = await response.text();
     let errorCode = '';
-    try { errorCode = JSON.parse(detail).error?.code ?? ''; } catch { /* Keep the provider response for logging below. */ }
+    try { errorCode = JSON.parse(detail).error?.code ?? ''; } catch { /* Provider error bodies vary by service. */ }
     if (attempt === 0 && response.status === 400 && errorCode === 'json_validate_failed') {
       console.warn('LLM JSON mode rejected the completion; retrying without provider JSON mode.', { model });
       continue;
     }
-    console.error('LLM provider failure', response.status, detail.slice(0, 500));
+    console.error('LLM provider failure', { status: response.status, model, code: String(errorCode).slice(0, 80) || 'unknown' });
+    if (response.status === 429) throw new Error('Question service is busy due to provider rate limits. Please wait a few seconds and try again.');
     throw new Error(`Question service error (${response.status}). Check the LLM provider secret/configuration.`);
   }
   if (!response?.ok) throw new Error('Question service request failed. Try generating again.');
