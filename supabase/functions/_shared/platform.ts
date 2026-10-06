@@ -90,13 +90,16 @@ export async function askModel(system: string, user: string, temperature = 0.25,
   let response: Response | undefined;
   for (let attempt = 0; attempt < 2; attempt++) {
     const retryingWithoutJsonMode = attempt === 1;
+    const completionTokens = maxCompletionTokens
+      ? retryingWithoutJsonMode ? Math.min(maxCompletionTokens * 2, 8000) : maxCompletionTokens
+      : undefined;
     response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model,
         temperature: retryingWithoutJsonMode ? Math.min(temperature, 0.1) : temperature,
-        ...(maxCompletionTokens ? { max_completion_tokens: maxCompletionTokens } : {}),
+        ...(completionTokens ? { max_completion_tokens: completionTokens } : {}),
         ...(!retryingWithoutJsonMode ? { response_format: { type: 'json_object' } } : {}),
         messages: [
           { role: 'system', content: retryingWithoutJsonMode ? `${system}\n\nOutput one valid JSON object only. Do not use markdown fences, comments, or trailing commas.` : system },
@@ -104,7 +107,41 @@ export async function askModel(system: string, user: string, temperature = 0.25,
         ],
       }),
     });
-    if (response.ok) break;
+    if (response.ok) {
+      const payload = await response.json();
+      const choice = payload.choices?.[0];
+      const message = choice?.message;
+      const rawContent = message?.content;
+      const content = typeof rawContent === 'string'
+        ? rawContent
+        : Array.isArray(rawContent)
+          ? rawContent.map((part: any) => typeof part?.text === 'string' ? part.text : '').join('')
+          : '';
+      if (content.trim()) {
+        try { return { value: parseJsonFromModel(content), provider: baseUrl, model }; }
+        catch (error) {
+          if (attempt === 0) {
+            console.warn('LLM returned non-JSON content; retrying without provider JSON mode.', { model, finishReason: choice?.finish_reason ?? null });
+            continue;
+          }
+          throw error;
+        }
+      }
+      const completionMetadata = {
+        model,
+        finishReason: choice?.finish_reason ?? null,
+        promptTokens: payload.usage?.prompt_tokens ?? null,
+        completionTokens: payload.usage?.completion_tokens ?? null,
+        messageKeys: message && typeof message === 'object' ? Object.keys(message) : [],
+        refused: Boolean(message?.refusal),
+      };
+      if (attempt === 0) {
+        console.warn('LLM returned an empty completion; retrying without provider JSON mode.', completionMetadata);
+        continue;
+      }
+      console.error('LLM returned an empty completion after retry.', completionMetadata);
+      throw new Error('Question service returned an empty response after retry. Please try again.');
+    }
 
     const detail = await response.text();
     let errorCode = '';
@@ -117,10 +154,7 @@ export async function askModel(system: string, user: string, temperature = 0.25,
     throw new Error(`Question service error (${response.status}). Check the LLM provider secret/configuration.`);
   }
   if (!response?.ok) throw new Error('Question service request failed. Try generating again.');
-  const payload = await response.json();
-  const content = payload.choices?.[0]?.message?.content;
-  if (!content) throw new Error('Question service returned an empty response.');
-  return { value: parseJsonFromModel(content), provider: baseUrl, model };
+  throw new Error('Question service request failed. Try generating again.');
 }
 
 export async function getOwnedSchema(admin: ReturnType<typeof serviceClient>, schemaId: string, userId: string) {

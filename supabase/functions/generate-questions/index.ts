@@ -98,7 +98,7 @@ Deno.serve(async (request) => {
         throw new Error(`Generated question ${index + 1} could not be validated after 3 repair attempts: ${validationIssues[index]}`);
       }
 
-      await Promise.all(invalidIndexes.map(async (index) => {
+      for (const index of invalidIndexes) {
         const current = candidates[index];
         const repair = await askModel(repairPrompt, JSON.stringify({
           difficulty,
@@ -106,13 +106,13 @@ Deno.serve(async (request) => {
           schemaSql: schema.schema_sql,
           question: current.candidate,
           validationIssue: validationIssues[index],
-        }), 0.2, 3500);
+        }), 0.2, 6000);
         const fixed = repair.value.question ?? repair.value;
         const referenceSql = String(fixed.referenceSql ?? '');
         const fields = Array.isArray(fixed.fields) ? fixed.fields : [];
         if (!fixed.prompt || !referenceSql || fields.length === 0) throw new Error(`The model could not repair generated question ${index + 1}.`);
         candidates[index] = { candidate: fixed, referenceSql, fields };
-      }));
+      }
       execution = await sandboxRequest('/execute-many', { ...sandboxPayload, queries: candidates.map((item: any) => item.referenceSql) });
     }
 
