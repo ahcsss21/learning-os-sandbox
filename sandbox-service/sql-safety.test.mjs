@@ -25,6 +25,7 @@ test('rejects non-literal or mutating seed SQL', () => {
 test('accepts read-only joins, aggregates, CTEs, and windows', () => {
   assert.ok(validateLearnerQuery('SELECT c.city, count(o.id) AS orders FROM customers c JOIN orders o ON o.customer_id = c.id GROUP BY c.city ORDER BY orders DESC'));
   assert.ok(validateLearnerQuery('WITH ranked AS (SELECT id, row_number() OVER (ORDER BY id) AS rn FROM orders) SELECT id FROM ranked WHERE rn = 1'));
+  assert.ok(validateLearnerQuery("SELECT substr('learning', 1, 3) AS prefix"));
 });
 
 test('rejects writes, cross-schema reads, and data-modifying CTEs', () => {

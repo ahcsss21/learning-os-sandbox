@@ -13,7 +13,7 @@ const allowedFunctions = new Set([
   'date_part', 'date_trunc', 'dense_rank', 'extract', 'first_value', 'floor', 'greatest',
   'lag', 'last_value', 'least', 'lead', 'left', 'length', 'lower', 'max', 'min', 'mod',
   'nth_value', 'ntile', 'nullif', 'percent_rank', 'position', 'power', 'rank', 'regexp_replace',
-  'replace', 'right', 'round', 'row_number', 'split_part', 'sqrt', 'string_agg', 'substring',
+  'replace', 'right', 'round', 'row_number', 'split_part', 'sqrt', 'string_agg', 'substr', 'substring',
   'sum', 'to_char', 'to_date', 'to_timestamp', 'trim', 'upper',
 ]);
 
