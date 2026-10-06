@@ -4,7 +4,7 @@ Learning OS is an SQL practice app built around assisted independence: learners 
 
 ## Live Demo
 
-Production URL: pending frontend hosting setup.
+Production URL: https://learning-os-sandbox.vercel.app
 
 ## Repository
 
@@ -29,6 +29,10 @@ The project is configured for Vercel. Import this repository into a Vercel proje
 
 Supabase Edge Functions and database migrations are managed separately. Apply pending migrations with `npx supabase db push` and deploy changed functions with `npx supabase functions deploy <function-name>` from the project root.
 
+Question and hint generation use an OpenAI-compatible chat completions provider. Set these server-only Supabase Function secrets: `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL`. Reasoning models such as `openai/gpt-oss-20b` default to low reasoning effort so hidden reasoning does not exhaust the completion budget; override with the optional `LLM_REASONING_EFFORT` secret. The shared client retries rate limits using the provider's advised delay.
+
+The SQL sandbox is a separate Docker service (`sandbox-service`), deployed on Render in the current setup. Redeploy it whenever its SQL allowlist changes.
+
 ## Architecture
 
 - React and Vite frontend
@@ -36,6 +40,16 @@ Supabase Edge Functions and database migrations are managed separately. Apply pe
 - Supabase Edge Functions for question generation, hints, query evaluation, schema save, and tester-authored sets
 - Restricted PostgreSQL sandbox service for validation and query execution
 - Private reference SQL and expected results stored in `practice_question_keys`
+
+## Question difficulty
+
+Generated questions are validated against their reference SQL in the sandbox, and the requested level is checked from the SQL structure rather than the model's own label:
+
+- **Low:** single table or one join; no `GROUP BY`/`HAVING`, window functions, CTEs, or subqueries.
+- **Medium:** ordinary combinations such as a join with one aggregation level, or one simple subquery or CTE. A derived-table aggregate (for example, count per member then average per city) is medium.
+- **High:** a window function, a CTE chain of at least three `SELECT` blocks, or a subquery compared against an aggregate, plus at least two distinct aggregate/window functions.
+
+Failed candidates are repaired with the specific rule they broke. The checks are regex-based on the SQL text, not a full parser, so edge cases can be misclassified.
 
 ## Checks
 

@@ -1,12 +1,12 @@
 {
   "name": "Learning OS Assisted Independence Workflow",
-  "version": 1,
+  "version": 2,
   "actors": ["learner", "Learning OS", "PostgreSQL sandbox", "facilitator"],
   "stages": [
     {
       "id": "prepare",
       "actor": "facilitator",
-      "action": "Choose a validated schema and assign a generated or curated question set.",
+      "action": "Choose a validated schema and assign a generated or curated question set. Generated questions are checked in the sandbox and their low, medium, or high level is validated from the reference SQL structure; failures are repaired with the specific rule broken.",
       "privacy": "Reference SQL and expected rows remain server-side."
     },
     {

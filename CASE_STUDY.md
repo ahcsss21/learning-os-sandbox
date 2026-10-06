@@ -39,6 +39,8 @@ The application evolved from manual coaching into an authenticated React/Supabas
 
 The latest hint-policy implementation adds an explicit five-level support ladder, starting broad and becoming more specific only after a subsequent failed attempt on the same issue. It maps database errors and result mismatches to task concepts, records independent versus hint-assisted success per skill, and allows one hint per failed attempt. This is an implementation of the assisted-independence hypothesis, not yet proof that it improves retention.
 
+Generated questions are labeled low, medium, or high, and early generations mislabeled difficulty, which would undermine any comparison across learners. The generator now states an explicit rubric and a server-side validator classifies each reference query from its SQL structure: low avoids grouping, windows, CTEs, and subqueries; medium is a join with one aggregation level or one simple subquery or CTE, including a derived-table aggregate; high needs a window function, a CTE chain of at least three SELECT blocks, or a subquery compared against an aggregate, plus at least two distinct aggregate or window functions. Failed candidates are sent back with the specific rule they broke.
+
 ## What we learned
 
 1. **The failure type matters.** A missing column, wrong enum value, incorrect grouping grain, and wrong ordering need different next steps.
@@ -46,6 +48,8 @@ The latest hint-policy implementation adds an explicit five-level support ladder
 3. **Correctness feedback needs a trustworthy contract.** Prompts must specify output fields, duplicates, ordering, ties, and numeric precision consistently with the hidden evaluator.
 4. **More help is not always better.** The coach should give one next step, wait for another attempt, and escalate only when the attempt shows the learner still needs help.
 5. **A chatbot baseline is not one fixed behavior.** Learners choose whether to request explanations, debugging, or a complete query. That variation should be recorded and described, not erased by assuming all participants requested answers.
+6. **Do not trust a model's self-reported metadata.** Requiring a minimum count of model-written reasoning steps rejected valid questions. Difficulty is now judged from the SQL, and the step list is descriptive only. The first structural rule also misclassified a two-stage derived aggregate as advanced, so the rules needed a test against the rubric's own examples.
+7. **LLM integration needs operational handling.** A reasoning model returned empty output when hidden reasoning consumed the completion budget, the provider's token-per-minute limit returned HTTP 429, and the sandbox rejected the equivalent `substr` alias. Fixes were low reasoning effort, retries that honor the provider's delay, and a reviewed safe-function allowlist addition.
 
 ## Evidence and limitations
 
@@ -59,4 +63,4 @@ Use a fixed, reviewed question bank and frozen seed data. Match app and baseline
 
 ## Current project status
 
-The core app and Edge Functions are implemented, including progressive hint support and curated question assignment. Supabase migrations and Edge Functions are deployed to the linked project. The frontend still requires production hosting configuration and an end-to-end live check of email recovery, tester access, and learner assignment before a public project link can be claimed.
+The core app and Edge Functions are implemented, including progressive hint support, curated question assignment, and structure-based difficulty validation. Supabase migrations and Edge Functions are deployed to the linked project, the frontend is hosted on Vercel at https://learning-os-sandbox.vercel.app, and the SQL sandbox runs as a separate service. An end-to-end live check of email password recovery, tester access, and learner assignment is still pending, so those flows should not be described as verified. Difficulty validation has been checked on sample queries but not against a large set of generations.
