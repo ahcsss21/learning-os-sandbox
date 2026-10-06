@@ -26,9 +26,9 @@ function candidateIssue(item: any, expected: { columns: string[]; rows: Record<s
       || (/\bwith\b/i.test(sql) && (sql.match(/\bselect\b/gi) ?? []).length >= 3)
       || (/\(\s*select\b/i.test(sql) && /\b(avg|sum|count|rank|row_number|lag|lead)\s*\(/i.test(sql));
     const computedOperations = new Set(Array.from(sql.matchAll(/\b(count|sum|avg|min|max|row_number|rank|dense_rank|lag|lead)\s*\(/gi), (match) => match[1].toLowerCase()));
-    if (reasoningSteps.length < 2 || !hasAdvancedConstruct || computedOperations.size < 2) {
-      return 'A high question must show at least two dependent reasoning steps and use an advanced SQL construct with multiple derived calculations.';
-    }
+    if (reasoningSteps.length < 2) return `A high question needs at least 2 dependent reasoningSteps; this one has ${reasoningSteps.length}. Add steps where one derived result feeds the next.`;
+    if (!hasAdvancedConstruct) return 'The referenceSql has no advanced construct. Rewrite it with a window function (ROW_NUMBER/RANK/DENSE_RANK/LAG/LEAD with OVER), or a CTE chain with at least 3 SELECT blocks, or a subquery that compares against an aggregate.';
+    if (computedOperations.size < 2) return `The referenceSql uses only ${computedOperations.size} distinct aggregate/window function(s) (${[...computedOperations].join(', ') || 'none'}). Combine at least two different ones, for example SUM or COUNT per group followed by RANK, LAG, or AVG over those results.`;
   }
   const hasWindowConstruct = [/\bover\s*\(/i, /\brow_number\s*\(/i, /\brank\s*\(/i, /\bdense_rank\s*\(/i, /\blag\s*\(/i, /\blead\s*\(/i].some((pattern) => pattern.test(item.referenceSql));
   if (requestedDifficulty === 'low' && (hasWindowConstruct || /\bwith\b/i.test(item.referenceSql))) return 'A low question cannot require window functions or CTEs.';
