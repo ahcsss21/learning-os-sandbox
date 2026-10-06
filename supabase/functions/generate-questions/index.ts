@@ -21,7 +21,8 @@ function candidateIssue(item: any, expected: { columns: string[]; rows: Record<s
   if (requestedDifficulty === 'medium' && reasoningSteps.length < 2) return 'A medium question must describe at least two linked reasoning steps.';
   if (requestedDifficulty === 'high') {
     const sql = item.referenceSql;
-    const hasAdvancedConstruct = /\b(over\s*\(|row_number\s*\(|rank\s*\(|dense_rank\s*\(|lag\s*\(|lead\s*\()/i.test(sql)
+    const hasWindowConstruct = [/\bover\s*\(/i, /\brow_number\s*\(/i, /\brank\s*\(/i, /\bdense_rank\s*\(/i, /\blag\s*\(/i, /\blead\s*\(/i].some((pattern) => pattern.test(sql));
+    const hasAdvancedConstruct = hasWindowConstruct
       || (/\bwith\b/i.test(sql) && (sql.match(/\bselect\b/gi) ?? []).length >= 3)
       || (/\(\s*select\b/i.test(sql) && /\b(avg|sum|count|rank|row_number|lag|lead)\s*\(/i.test(sql));
     const computedOperations = new Set(Array.from(sql.matchAll(/\b(count|sum|avg|min|max|row_number|rank|dense_rank|lag|lead)\s*\(/gi), (match) => match[1].toLowerCase()));
@@ -29,7 +30,8 @@ function candidateIssue(item: any, expected: { columns: string[]; rows: Record<s
       return 'A high question must show at least two dependent reasoning steps and use an advanced SQL construct with multiple derived calculations.';
     }
   }
-  if (requestedDifficulty === 'low' && /\b(over\s*\(|row_number\s*\(|rank\s*\(|dense_rank\s*\(|lag\s*\(|lead\s*\(|\bwith\b/i.test(item.referenceSql)) return 'A low question cannot require window functions or CTEs.';
+  const hasWindowConstruct = [/\bover\s*\(/i, /\brow_number\s*\(/i, /\brank\s*\(/i, /\bdense_rank\s*\(/i, /\blag\s*\(/i, /\blead\s*\(/i].some((pattern) => pattern.test(item.referenceSql));
+  if (requestedDifficulty === 'low' && (hasWindowConstruct || /\bwith\b/i.test(item.referenceSql))) return 'A low question cannot require window functions or CTEs.';
   if (fieldNames.some((name: string) => !expected.columns.includes(name))) return 'The reference query column aliases do not match the canonical output field names.';
   if (new Set(fieldNames.map((name: string) => name.toLowerCase())).size !== fieldNames.length) return 'Output field names must be unique.';
   const prompt = String(item.candidate.prompt ?? '');
