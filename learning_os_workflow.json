@@ -1,0 +1,49 @@
+{
+  "name": "Learning OS Assisted Independence Workflow",
+  "version": 1,
+  "actors": ["learner", "Learning OS", "PostgreSQL sandbox", "facilitator"],
+  "stages": [
+    {
+      "id": "prepare",
+      "actor": "facilitator",
+      "action": "Choose a validated schema and assign a generated or curated question set.",
+      "privacy": "Reference SQL and expected rows remain server-side."
+    },
+    {
+      "id": "attempt",
+      "actor": "learner",
+      "action": "Read the task, inspect the schema or data as allowed, write SQL, and run an attempt."
+    },
+    {
+      "id": "execute",
+      "actor": "PostgreSQL sandbox",
+      "action": "Run the read-only query in an isolated schema and return rows or a database error."
+    },
+    {
+      "id": "evaluate",
+      "actor": "Learning OS",
+      "action": "Compare output fields, complete rows, duplicates, values, and required ordering with the private answer contract."
+    },
+    {
+      "id": "hint",
+      "actor": "Learning OS",
+      "action": "After an incorrect attempt, provide one contextual hint at a calibrated support level; escalate only after a new attempt leaves the same issue unresolved.",
+      "constraints": ["one hint per failed attempt", "never reveal reference SQL", "never reveal expected rows"]
+    },
+    {
+      "id": "retry",
+      "actor": "learner",
+      "action": "Revise and run another query; stop hinting when the task is correct."
+    },
+    {
+      "id": "review",
+      "actor": "Learning OS",
+      "action": "Store attempts, hint levels, outcomes, and time for learner history and facilitator review."
+    },
+    {
+      "id": "transfer",
+      "actor": "learner",
+      "action": "Complete a new task in no-help mode with correctness feedback withheld until final submission."
+    }
+  ]
+}
