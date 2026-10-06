@@ -16,26 +16,32 @@ function candidateIssue(item: any, expected: { columns: string[]; rows: Record<s
   const fieldNames = item.fields.map((field: any) => String(field.name));
   if (item.candidate.difficulty !== requestedDifficulty) return `The question declares ${item.candidate.difficulty ?? 'no'} difficulty but the requested level is ${requestedDifficulty}.`;
   if (typeof item.candidate.difficultyRationale !== 'string' || !item.candidate.difficultyRationale.trim()) return 'The question is missing its internal difficulty rationale.';
-  const rawSteps = typeof item.candidate.reasoningSteps === 'string' ? [item.candidate.reasoningSteps] : Array.isArray(item.candidate.reasoningSteps) ? item.candidate.reasoningSteps : [];
-  // Models often pack several steps into one string, so split on list markers and sequencing words.
-  const reasoningSteps = rawSteps
-    .filter((step: unknown): step is string => typeof step === 'string' && step.trim().length > 0)
-    .flatMap((step: string) => step.split(/\s*(?:;|\bthen\b|\bnext\b|\d+[.)]\s)\s*/i).filter((part) => part.trim().length > 3));
-  if (requestedDifficulty === 'low' && reasoningSteps.length < 1) return 'A low question must identify its single direct reasoning step.';
-  if (requestedDifficulty === 'medium' && reasoningSteps.length < 2) return 'A medium question must describe at least two linked reasoning steps.';
+  // Difficulty is judged from the SQL itself; model-reported steps are only descriptive metadata.
+  const sql = String(item.referenceSql).replace(/'(?:''|[^'])*'/g, "'x'");
+  const hasWindowConstruct = /\bover\s*\(/i.test(sql) || /\b(row_number|rank|dense_rank|lag|lead)\s*\(/i.test(sql);
+  const hasCte = /^\s*with\b/i.test(sql);
+  const selectBlocks = (sql.match(/\bselect\b/gi) ?? []).length;
+  const hasSubquery = /\(\s*select\b/i.test(sql);
+  const joinCount = (sql.match(/\bjoin\b/gi) ?? []).length;
+  const hasGroupBy = /\bgroup\s+by\b/i.test(sql);
+  const computedOperations = new Set(Array.from(sql.matchAll(/\b(count|sum|avg|min|max|row_number|rank|dense_rank|lag|lead)\s*\(/gi), (match) => match[1].toLowerCase()));
+  const hasAdvancedConstruct = hasWindowConstruct
+    || (hasCte && selectBlocks >= 3)
+    || (hasSubquery && computedOperations.size > 0);
+  const looksHigh = hasAdvancedConstruct && computedOperations.size >= 2;
+  if (requestedDifficulty === 'low') {
+    if (hasWindowConstruct || hasCte || hasSubquery) return 'A low question cannot use window functions, CTEs, or subqueries. Rewrite it as a single-table query or one simple join.';
+    if (hasGroupBy || /\bhaving\b/i.test(sql)) return 'A low question cannot use GROUP BY or HAVING. Use projection, filtering, ordering, or limiting instead.';
+    if (joinCount > 1) return 'A low question may use at most one join.';
+  }
+  if (requestedDifficulty === 'medium') {
+    if (!joinCount && !hasGroupBy && !hasSubquery && !hasCte && computedOperations.size === 0) return 'A medium question must combine ordinary concepts such as a join, an aggregation with GROUP BY, or one simple subquery or CTE.';
+    if (looksHigh) return 'This SQL is more advanced than medium (an advanced construct plus multiple derived calculations). Simplify it to one join with a single aggregation level, or one simple subquery or CTE.';
+  }
   if (requestedDifficulty === 'high') {
-    const sql = item.referenceSql;
-    const hasWindowConstruct = [/\bover\s*\(/i, /\brow_number\s*\(/i, /\brank\s*\(/i, /\bdense_rank\s*\(/i, /\blag\s*\(/i, /\blead\s*\(/i].some((pattern) => pattern.test(sql));
-    const hasAdvancedConstruct = hasWindowConstruct
-      || (/\bwith\b/i.test(sql) && (sql.match(/\bselect\b/gi) ?? []).length >= 3)
-      || (/\(\s*select\b/i.test(sql) && /\b(avg|sum|count|rank|row_number|lag|lead)\s*\(/i.test(sql));
-    const computedOperations = new Set(Array.from(sql.matchAll(/\b(count|sum|avg|min|max|row_number|rank|dense_rank|lag|lead)\s*\(/gi), (match) => match[1].toLowerCase()));
-    if (reasoningSteps.length < 1) return 'A high question must list its reasoningSteps, where each derived result feeds the next.';
     if (!hasAdvancedConstruct) return 'The referenceSql has no advanced construct. Rewrite it with a window function (ROW_NUMBER/RANK/DENSE_RANK/LAG/LEAD with OVER), or a CTE chain with at least 3 SELECT blocks, or a subquery that compares against an aggregate.';
     if (computedOperations.size < 2) return `The referenceSql uses only ${computedOperations.size} distinct aggregate/window function(s) (${[...computedOperations].join(', ') || 'none'}). Combine at least two different ones, for example SUM or COUNT per group followed by RANK, LAG, or AVG over those results.`;
   }
-  const hasWindowConstruct = [/\bover\s*\(/i, /\brow_number\s*\(/i, /\brank\s*\(/i, /\bdense_rank\s*\(/i, /\blag\s*\(/i, /\blead\s*\(/i].some((pattern) => pattern.test(item.referenceSql));
-  if (requestedDifficulty === 'low' && (hasWindowConstruct || /\bwith\b/i.test(item.referenceSql))) return 'A low question cannot require window functions or CTEs.';
   if (fieldNames.some((name: string) => !expected.columns.includes(name))) return 'The reference query column aliases do not match the canonical output field names.';
   if (new Set(fieldNames.map((name: string) => name.toLowerCase())).size !== fieldNames.length) return 'Output field names must be unique.';
   const prompt = String(item.candidate.prompt ?? '');
