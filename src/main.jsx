@@ -2,7 +2,7 @@ import { StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Activity, ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Code2, Database, FilePlus2, History, Lightbulb, LogOut, Plus, Play, Send, Sparkles, Timer, WandSparkles, X } from 'lucide-react';
 import { hasSupabaseConfig, supabase } from './supabase';
-import { askForHint, completeSession, createFixedQuestionSet, createSession, generateQuestionSet, generateSchema, getQuestionSet, getSessionHistory, listOwnedData, requestPasswordReset, runSandbox, saveSchema, signIn, signOut, signUp, updatePassword } from './platformApi';
+import { askForHint, completeSession, createFixedQuestionSet, createSession, generateQuestionSet, generateSchema, getQuestionSet, getSessionHistory, getTesterAccess, listOwnedData, requestPasswordReset, runSandbox, saveSchema, signIn, signOut, signUp, updatePassword } from './platformApi';
 import './styles.css';
 
 function App() {
@@ -11,6 +11,7 @@ function App() {
   const [authMode, setAuthMode] = useState('signin');
   const [authNotice, setAuthNotice] = useState('');
   const [recovering, setRecovering] = useState(false);
+  const [isTester, setIsTester] = useState(false);
   const [view, setView] = useState('home');
   const [workspace, setWorkspace] = useState({ schemas: [], sets: [], sessions: [] });
   const [loading, setLoading] = useState(false);
@@ -43,6 +44,13 @@ function App() {
   useEffect(() => {
     if (!user) { setWorkspace({ schemas: [], sets: [], sessions: [] }); return; }
     refreshWorkspace();
+  }, [user?.id]);
+
+  useEffect(() => {
+    let active = true;
+    if (!user) { setIsTester(false); return () => { active = false; }; }
+    getTesterAccess().then((access) => { if (active) setIsTester(Boolean(access.isTester)); }).catch(() => { if (active) setIsTester(false); });
+    return () => { active = false; };
   }, [user?.id]);
 
   useEffect(() => { if (toast) { const timer = setTimeout(() => setToast(''), 3200); return () => clearTimeout(timer); } }, [toast]);
@@ -177,9 +185,6 @@ function App() {
 
   const activeQuestion = questions[currentQuestionIndex];
   const activeSchema = workspace.schemas.find((item) => item.id === (activeSession?.schema_id ?? activeSet?.schema_id));
-  const testerEmails = String(import.meta.env.VITE_TESTER_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean);
-  const isTester = Boolean(user?.email && testerEmails.includes(user.email.toLowerCase()));
-
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark"><Sparkles size={18} /></div><div><strong>Learning OS</strong><span>Assisted independence</span></div></div>

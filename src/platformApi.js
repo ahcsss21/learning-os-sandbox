@@ -75,6 +75,10 @@ export async function generateQuestionSet(input) {
   return invoke('generate-questions', input);
 }
 
+export async function getTesterAccess() {
+  return invoke('tester-access', {});
+}
+
 export async function createFixedQuestionSet(input) {
   return invoke('create-test-set', input);
 }

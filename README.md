@@ -13,11 +13,11 @@ https://github.com/ahcsss21/learning-os-sandbox
 ## Run locally
 
 1. Install Node.js 20 or later.
-2. Copy `.env.example` to `.env.local` and fill in your Supabase project URL, publishable key, and tester email allowlist if needed.
+2. Copy `.env.example` to `.env.local` and fill in your Supabase project URL and publishable key.
 3. Install dependencies with `npm ci`.
 4. Start the app with `npm run dev -- --host 127.0.0.1`.
 
-The tester email allowlist only controls whether the authoring screen is shown. The `TESTER_EMAILS` Supabase Function secret is the server-side access check. Never put a service-role key in a Vite variable.
+Tester access is checked server-side against the `TESTER_EMAILS` Supabase Function secret; tester addresses are not included in the frontend bundle. Never put a service-role key in a Vite variable.
 
 ## Production deployment
 
@@ -25,9 +25,7 @@ The project is configured for Vercel. Import this repository into a Vercel proje
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-- `VITE_TESTER_EMAILS` (comma-separated, optional; controls tester UI visibility)
-
-Set the server-only Supabase Function secret `TESTER_EMAILS` to the same tester email list. In Supabase Authentication URL Configuration, allow the deployed site URL for redirects, including password recovery. Deploy the frontend after setting its environment variables.
+- Set the server-only Supabase Function secret `TESTER_EMAILS` to the comma-separated tester email list. In Supabase Authentication URL Configuration, allow the deployed site URL for redirects, including password recovery. Deploy the frontend after setting its environment variables.
 
 Supabase Edge Functions and database migrations are managed separately. Apply pending migrations with `npx supabase db push` and deploy changed functions with `npx supabase functions deploy <function-name>` from the project root.
 
