@@ -22,13 +22,14 @@ function candidateIssue(item: any, expected: { columns: string[]; rows: Record<s
   const hasCte = /^\s*with\b/i.test(sql);
   const selectBlocks = (sql.match(/\bselect\b/gi) ?? []).length;
   const hasSubquery = /\(\s*select\b/i.test(sql);
+  const hasComparisonSubquery = /(?:<=|>=|<>|!=|[<>=]|\b(?:any|all|in)\b)\s*\(\s*select\b/i.test(sql);
   const joinCount = (sql.match(/\bjoin\b/gi) ?? []).length;
   const hasGroupBy = /\bgroup\s+by\b/i.test(sql);
   const computedOperations = new Set(Array.from(sql.matchAll(/\b(count|sum|avg|min|max|row_number|rank|dense_rank|lag|lead)\s*\(/gi), (match) => match[1].toLowerCase()));
-  const hasAdvancedConstruct = hasWindowConstruct
-    || (hasCte && selectBlocks >= 3)
-    || (hasSubquery && computedOperations.size > 0);
-  const looksHigh = hasAdvancedConstruct && computedOperations.size >= 2;
+  const hasCteChain = hasCte && selectBlocks >= 3;
+  // A FROM-clause derived aggregate stays medium, so only comparison subqueries count as advanced.
+  const hasAdvancedConstruct = hasWindowConstruct || hasCteChain || (hasComparisonSubquery && computedOperations.size > 0);
+  const looksHigh = (hasWindowConstruct || hasCteChain) && computedOperations.size >= 2;
   if (requestedDifficulty === 'low') {
     if (hasWindowConstruct || hasCte || hasSubquery) return 'A low question cannot use window functions, CTEs, or subqueries. Rewrite it as a single-table query or one simple join.';
     if (hasGroupBy || /\bhaving\b/i.test(sql)) return 'A low question cannot use GROUP BY or HAVING. Use projection, filtering, ordering, or limiting instead.';
@@ -36,10 +37,10 @@ function candidateIssue(item: any, expected: { columns: string[]; rows: Record<s
   }
   if (requestedDifficulty === 'medium') {
     if (!joinCount && !hasGroupBy && !hasSubquery && !hasCte && computedOperations.size === 0) return 'A medium question must combine ordinary concepts such as a join, an aggregation with GROUP BY, or one simple subquery or CTE.';
-    if (looksHigh) return 'This SQL is more advanced than medium (an advanced construct plus multiple derived calculations). Simplify it to one join with a single aggregation level, or one simple subquery or CTE.';
+    if (looksHigh) return 'This SQL is more advanced than medium (an advanced construct plus multiple derived calculations). Simplify it to one join with a single aggregation level, or one simple subquery or CTE, and remove window functions and multi-stage CTE chains.';
   }
   if (requestedDifficulty === 'high') {
-    if (!hasAdvancedConstruct) return 'The referenceSql has no advanced construct. Rewrite it with a window function (ROW_NUMBER/RANK/DENSE_RANK/LAG/LEAD with OVER), or a CTE chain with at least 3 SELECT blocks, or a subquery that compares against an aggregate.';
+    if (!hasAdvancedConstruct) return 'The referenceSql has no advanced construct. Rewrite it with a window function (ROW_NUMBER/RANK/DENSE_RANK/LAG/LEAD with OVER), or a CTE chain with at least 3 SELECT blocks, or a subquery in WHERE/HAVING that compares against an aggregate (a derived table in FROM alone is only medium).';
     if (computedOperations.size < 2) return `The referenceSql uses only ${computedOperations.size} distinct aggregate/window function(s) (${[...computedOperations].join(', ') || 'none'}). Combine at least two different ones, for example SUM or COUNT per group followed by RANK, LAG, or AVG over those results.`;
   }
   if (fieldNames.some((name: string) => !expected.columns.includes(name))) return 'The reference query column aliases do not match the canonical output field names.';
