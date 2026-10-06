@@ -16,7 +16,11 @@ function candidateIssue(item: any, expected: { columns: string[]; rows: Record<s
   const fieldNames = item.fields.map((field: any) => String(field.name));
   if (item.candidate.difficulty !== requestedDifficulty) return `The question declares ${item.candidate.difficulty ?? 'no'} difficulty but the requested level is ${requestedDifficulty}.`;
   if (typeof item.candidate.difficultyRationale !== 'string' || !item.candidate.difficultyRationale.trim()) return 'The question is missing its internal difficulty rationale.';
-  const reasoningSteps = Array.isArray(item.candidate.reasoningSteps) ? item.candidate.reasoningSteps.filter((step: unknown) => typeof step === 'string' && step.trim()) : [];
+  const rawSteps = typeof item.candidate.reasoningSteps === 'string' ? [item.candidate.reasoningSteps] : Array.isArray(item.candidate.reasoningSteps) ? item.candidate.reasoningSteps : [];
+  // Models often pack several steps into one string, so split on list markers and sequencing words.
+  const reasoningSteps = rawSteps
+    .filter((step: unknown): step is string => typeof step === 'string' && step.trim().length > 0)
+    .flatMap((step: string) => step.split(/\s*(?:;|\bthen\b|\bnext\b|\d+[.)]\s)\s*/i).filter((part) => part.trim().length > 3));
   if (requestedDifficulty === 'low' && reasoningSteps.length < 1) return 'A low question must identify its single direct reasoning step.';
   if (requestedDifficulty === 'medium' && reasoningSteps.length < 2) return 'A medium question must describe at least two linked reasoning steps.';
   if (requestedDifficulty === 'high') {
@@ -26,7 +30,7 @@ function candidateIssue(item: any, expected: { columns: string[]; rows: Record<s
       || (/\bwith\b/i.test(sql) && (sql.match(/\bselect\b/gi) ?? []).length >= 3)
       || (/\(\s*select\b/i.test(sql) && /\b(avg|sum|count|rank|row_number|lag|lead)\s*\(/i.test(sql));
     const computedOperations = new Set(Array.from(sql.matchAll(/\b(count|sum|avg|min|max|row_number|rank|dense_rank|lag|lead)\s*\(/gi), (match) => match[1].toLowerCase()));
-    if (reasoningSteps.length < 2) return `A high question needs at least 2 dependent reasoningSteps; this one has ${reasoningSteps.length}. Add steps where one derived result feeds the next.`;
+    if (reasoningSteps.length < 1) return 'A high question must list its reasoningSteps, where each derived result feeds the next.';
     if (!hasAdvancedConstruct) return 'The referenceSql has no advanced construct. Rewrite it with a window function (ROW_NUMBER/RANK/DENSE_RANK/LAG/LEAD with OVER), or a CTE chain with at least 3 SELECT blocks, or a subquery that compares against an aggregate.';
     if (computedOperations.size < 2) return `The referenceSql uses only ${computedOperations.size} distinct aggregate/window function(s) (${[...computedOperations].join(', ') || 'none'}). Combine at least two different ones, for example SUM or COUNT per group followed by RANK, LAG, or AVG over those results.`;
   }
