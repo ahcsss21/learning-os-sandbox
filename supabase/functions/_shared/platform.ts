@@ -103,6 +103,7 @@ export async function askModel(system: string, user: string, temperature = 0.25,
   if (!apiKey) throw new Error('Question/hint generation is not configured yet. A tester must set the LLM_API_KEY Supabase Function secret.');
   const baseUrl = (Deno.env.get('LLM_BASE_URL') || 'https://api.openai.com/v1').replace(/\/$/, '');
   const model = Deno.env.get('LLM_MODEL') || 'gpt-4o-mini';
+  const reasoningEffort = Deno.env.get('LLM_REASONING_EFFORT') || (/gpt-oss/i.test(model) ? 'low' : '');
   let response: Response | undefined;
   let useJsonMode = true;
   let attempt = 0;
@@ -114,6 +115,8 @@ export async function askModel(system: string, user: string, temperature = 0.25,
       model,
       temperature: strictRetry ? Math.min(temperature, 0.1) : temperature,
       ...(retryTokenBudget ? { max_completion_tokens: retryTokenBudget } : {}),
+      // Hidden reasoning tokens share the completion budget and can leave the visible JSON empty.
+      ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
       ...(useJsonMode ? { response_format: { type: 'json_object' } } : {}),
       messages: [
         { role: 'system', content: strictRetry ? `${system}\n\nReturn exactly one valid JSON object. Do not use markdown fences, comments, or trailing commas.` : system },
@@ -169,6 +172,7 @@ export async function askModel(system: string, user: string, temperature = 0.25,
         ...completionMetadata,
         refused: Boolean(message?.refusal),
       });
+      if (choice?.finish_reason === 'length') retryTokenBudget = Math.min((retryTokenBudget ?? 4096) * 2, 8000);
       if (attempt < 3) continue;
       throw new Error('Question service returned an empty response after retries. Please try again.');
     }
