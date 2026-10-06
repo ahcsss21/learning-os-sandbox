@@ -104,15 +104,19 @@ export async function askModel(system: string, user: string, temperature = 0.25,
   const baseUrl = (Deno.env.get('LLM_BASE_URL') || 'https://api.openai.com/v1').replace(/\/$/, '');
   const model = Deno.env.get('LLM_MODEL') || 'gpt-4o-mini';
   let response: Response | undefined;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const retryingWithoutJsonMode = attempt === 1;
+  let useJsonMode = true;
+  let attempt = 0;
+  let retryTokenBudget = maxCompletionTokens;
+  while (attempt < 3) {
+    const strictRetry = attempt > 0;
+    attempt++;
     const requestBody = JSON.stringify({
       model,
-      temperature: retryingWithoutJsonMode ? Math.min(temperature, 0.1) : temperature,
-      ...(maxCompletionTokens ? { max_completion_tokens: maxCompletionTokens } : {}),
-      ...(!retryingWithoutJsonMode ? { response_format: { type: 'json_object' } } : {}),
+      temperature: strictRetry ? Math.min(temperature, 0.1) : temperature,
+      ...(retryTokenBudget ? { max_completion_tokens: retryTokenBudget } : {}),
+      ...(useJsonMode ? { response_format: { type: 'json_object' } } : {}),
       messages: [
-        { role: 'system', content: retryingWithoutJsonMode ? `${system}\n\nOutput one valid JSON object only. Do not use markdown fences, comments, or trailing commas.` : system },
+        { role: 'system', content: strictRetry ? `${system}\n\nReturn exactly one valid JSON object. Do not use markdown fences, comments, or trailing commas.` : system },
         { role: 'user', content: user },
       ],
     });
@@ -144,37 +148,37 @@ export async function askModel(system: string, user: string, temperature = 0.25,
         : Array.isArray(rawContent)
           ? rawContent.map((part: any) => typeof part?.text === 'string' ? part.text : '').join('')
           : '';
-      if (content.trim()) {
-        try { return { value: parseJsonFromModel(content), provider: baseUrl, model }; }
-        catch (error) {
-          if (attempt === 0) {
-            console.warn('LLM returned non-JSON content; retrying without provider JSON mode.', { model, finishReason: choice?.finish_reason ?? null });
-            continue;
-          }
-          throw error;
-        }
-      }
       const completionMetadata = {
         model,
+        attempt,
         finishReason: choice?.finish_reason ?? null,
         promptTokens: payload.usage?.prompt_tokens ?? null,
         completionTokens: payload.usage?.completion_tokens ?? null,
-        messageKeys: message && typeof message === 'object' ? Object.keys(message) : [],
-        refused: Boolean(message?.refusal),
+        contentLength: content.length,
       };
-      if (attempt === 0) {
-        console.warn('LLM returned an empty completion; retrying without provider JSON mode.', completionMetadata);
-        continue;
+      if (content.trim()) {
+        try { return { value: parseJsonFromModel(content), provider: baseUrl, model }; }
+        catch {
+          console.warn('LLM completion was not valid JSON; retrying with provider JSON mode.', completionMetadata);
+          if (choice?.finish_reason === 'length') retryTokenBudget = Math.min((retryTokenBudget ?? 4096) * 2, 8000);
+          if (attempt < 3) continue;
+          throw new Error('Question service returned invalid JSON after retries. Please try again.');
+        }
       }
-      console.error('LLM returned an empty completion after retry.', completionMetadata);
-      throw new Error('Question service returned an empty response after retry. Please try again.');
+      console.warn('LLM returned an empty completion; retrying with provider JSON mode.', {
+        ...completionMetadata,
+        refused: Boolean(message?.refusal),
+      });
+      if (attempt < 3) continue;
+      throw new Error('Question service returned an empty response after retries. Please try again.');
     }
 
     const detail = await response.text();
     let errorCode = '';
     try { errorCode = JSON.parse(detail).error?.code ?? ''; } catch { /* Provider error bodies vary by service. */ }
-    if (attempt === 0 && response.status === 400 && errorCode === 'json_validate_failed') {
-      console.warn('LLM JSON mode rejected the completion; retrying without provider JSON mode.', { model });
+    if (useJsonMode && response.status === 400 && errorCode === 'json_validate_failed' && attempt < 3) {
+      useJsonMode = false;
+      console.warn('LLM JSON mode was rejected; retrying without provider JSON mode.', { model });
       continue;
     }
     console.error('LLM provider failure', { status: response.status, model, code: String(errorCode).slice(0, 80) || 'unknown' });
