@@ -59,4 +59,8 @@ npm run build
 npm test --prefix sandbox-service
 ```
 
-The case study is in `CASE_STUDY.md`. The demonstration talk track is maintained separately from the public repository.
+## Evaluation status
+
+The evidence is reported in three separate activities: two-person manual discovery, a pre-final-app review of six learner capture profiles, and three post-build app/baseline task-set rounds. These are exploratory observations, not one controlled study. The current artifacts do not establish the C7 requirement of a six-or-more learner baseline-versus-removal comparison with a complete, consistently scored held-out dataset. See `CASE_STUDY.md` for outcomes and limitations.
+
+The demonstration talk track is maintained separately from the public repository.
