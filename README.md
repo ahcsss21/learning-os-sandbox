@@ -61,6 +61,6 @@ npm test --prefix sandbox-service
 
 ## Evaluation status
 
-The evidence is reported in three separate activities: two-person manual discovery, a pre-final-app review of six learner capture profiles, and three post-build app/baseline task-set rounds. These are exploratory observations, not one controlled study. The current artifacts do not establish the C7 requirement of a six-or-more learner baseline-versus-removal comparison with a complete, consistently scored held-out dataset. See `CASE_STUDY.md` for outcomes and limitations.
+The evidence is reported in three separate activities: two-person manual discovery, a pre-final-app review of six learner capture profiles, and a post-build removal run with six learners split 3/3 between the hint-assisted app and ordinary-chatbot baseline. All six held-out captures are present; app outcomes are 2/3 correct with one unfinished, while two baseline captures show misses and one needs its prompt recovered before scoring. See `CASE_STUDY.md` for the per-round evidence and limitations. These small exploratory results do not establish causal impact.
 
 The demonstration talk track is maintained separately from the public repository.
