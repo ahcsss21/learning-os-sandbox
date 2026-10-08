@@ -61,6 +61,6 @@ npm test --prefix sandbox-service
 
 ## Evaluation status
 
-The evidence is reported in three separate activities: two-person manual discovery, a pre-final-app review of six learner capture profiles, and a post-build removal run with six learners split 3/3 between the hint-assisted app and ordinary-chatbot baseline. All six held-out captures are present; app outcomes are 2/3 correct with one unfinished, while two baseline captures show misses and one needs its prompt recovered before scoring. See `CASE_STUDY.md` for the per-round evidence and limitations. These small exploratory results do not establish causal impact.
+The evidence is reported in three separate activities: two-person manual discovery, a pre-final-app review of six learner capture profiles, and a post-build removal run with six learners split 3/3 between the hint-assisted app and ordinary-chatbot baseline. All six held-out outcomes are scored: app outcomes are 2/3 correct with one unfinished, and baseline outcomes are 0/3 correct. See `CASE_STUDY.md` for per-round evidence and limitations. These small exploratory results do not establish causal impact.
 
 The demonstration talk track is maintained separately from the public repository.

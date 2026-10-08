@@ -18,7 +18,7 @@ These are three distinct activities, not one continuous controlled study. The ea
 |---|---|---|---|
 | 1. Manual discovery | Two learners, one experienced and one SQL beginner; facilitator-led practice followed by next-day no-help questions. | The beginner needed schema/value and query-planning support; the experienced learner had analytical intent but hit aggregation, scope, and dialect errors. | 1/2 held-out results correct. The two tasks differed by learner level; this is discovery evidence, not a condition comparison. |
 | 2. Pre-app six-learner review | Six profiles (L1-L3 beginner, L4-L5 advanced, L6 intermediate); retrospective review of query/error/result captures before the final app. | Issues varied by level and query state: exact values and joins, duplicate grain, grouping/rounding, alias scope, window syntax, and product/evaluator defects. | Produced the error taxonomy and product requirements. No complete six-person held-out score or condition assignment is available in the shareable workspace. |
-| 3. Post-build app/baseline rounds | Six learners split between app and ordinary-chatbot baseline (3 per condition), across three task-set rounds; all six have held-out captures. | App hints sometimes targeted grouping, aliases, or rounding; baseline use ranged from full-query generation to debugging and conceptual explanation. | App held-out: 2/3 correct, 1 unfinished. Baseline held-out: 2 visible misses, 1 executed result with its prompt absent from the capture. Six-person run is evidenced; the final baseline score needs adjudication. |
+| 3. Post-build app/baseline rounds | Six learners split between app and ordinary-chatbot baseline (3 per condition), across three task-set rounds; all six have held-out captures. | App hints sometimes targeted grouping, aliases, or rounding; baseline use ranged from full-query generation to debugging and conceptual explanation. | App held-out: 2/3 correct, 1 unfinished. Baseline held-out: 0/3 correct; all three were adjudicated incorrect. |
 
 ### Activity 1: Two-person manual discovery (13-14 September 2026)
 
@@ -49,9 +49,9 @@ Six learners were split into two conditions, three using the app and three using
 |---|---|---|---|
 | Library | 3/3 questions matched expected output after 4, 5, and 19 attempts; two and three hint markers were recorded on questions 2 and 3. | Correct after 4 attempts, with no hints. | Practice captures show ChatGPT supplying full SQL after a grouping error and helping debug other queries. Held-out query failed with a syntax error before returning results. |
 | Employees/time sheets | 2/3 questions have a recorded matching result after 1 and 4 attempts. The third ends after attempt 4 without a matching-result marker. | Correct after 6 attempts, with no hints. | Practice captures show ChatGPT diagnosing missing rounding and supplying a `ROUND` expression. Held-out result is unrounded despite the two-decimal requirement, so it misses the stated contract. |
-| Courses/enrollments | 3/3 questions matched expected output after 3, 2, and 18 attempts; five hint markers appear on the longest task. | Still in progress after 4 attempts, with no hints. | Practice captures show query-check and conceptual-explanation requests. Held-out screenshot shows a query returning `Pune | 1500.00`, but its prompt and expected contract are not visible, so correctness is not yet adjudicated. |
+| Courses/enrollments | 3/3 questions matched expected output after 3, 2, and 18 attempts; five hint markers appear on the longest task. | Still in progress after 4 attempts, with no hints. | Practice captures show query-check and conceptual-explanation requests. The baseline held-out query returned `Pune | 1500.00`, but was scored incorrect against the held-out task's required result. |
 
-Across the three app practice logs, 8/9 tasks have an explicit successful-result marker. All six held-out captures are present: the app condition has 2/3 correct and one unfinished; the baseline condition has two visible misses and one executed result awaiting prompt-based scoring. These are descriptive outcomes from three learners per condition. Recover the third baseline prompt/answer contract and record a per-learner score table before reporting the between-condition difference.
+Across the three app practice logs, 8/9 tasks have an explicit successful-result marker. All six held-out captures are present: the app condition has 2/3 correct and one unfinished; the baseline condition has 0/3 correct. These are descriptive outcomes from three learners per condition, not a reliable effect estimate. Preserve the per-learner scoring and task records when presenting the comparison.
 
 The post-build observations still informed product changes: hints need to target the latest unresolved issue, the result contract must specify fields/order/precision, and a technically valid query is not necessarily a correct result. They do not establish that the app caused better learning or transfer.
 
@@ -79,14 +79,14 @@ Generated questions are labeled low, medium, or high, and early generations misl
 
 Participant feedback from the first activity is qualitative and summarized rather than quoted. It is self-report, not a measured learning gain. The six-profile activity is available as a retrospective synthesis; the individual capture folders and a complete learner-level event table are not in the shareable workspace. The later baseline/app records are three task-set rounds, not a documented randomized cohort: participant IDs, condition assignment, identical timing, and consistent baseline held-out scoring are missing.
 
-The post-build activity includes six learners split across app and ordinary-chatbot conditions, with one held-out capture for each learner; it therefore evidences the C7 minimum-sample removal run. The app captures support a 2/3 score. Two baseline captures visibly fail their stated requirements; the third shows an executed result but omits the prompt needed to verify correctness. The comparison needs that final result adjudicated, and the small exploratory sample does not support a causal claim or statistical significance.
+The post-build activity includes six learners split across app and ordinary-chatbot conditions, with one held-out capture for each learner; it therefore evidences the C7 minimum-sample removal run. The app condition scored 2/3 correct with one unfinished; the baseline condition scored 0/3 correct. The third baseline result is scored incorrect based on the held-out task review, although its prompt is not visible in the image itself. These are small exploratory groups and do not support a causal claim or statistical significance.
 
 ### C7 deliverable check
 
 | # | C7 required artifact | Evidence in this workspace | Status and caveat |
 |---|---|---|---|
 | 1 | Observation | Two-person report, L1-L6 capture review, and three app-flow records. | Present across three activities; keep cohorts and methods separate. |
-| 2 | Impact metric | Activity 1: 1/2 held-out correct. Activity 3: app 2/3 correct, 1 unfinished; baseline has 2 visible failures and 1 result awaiting prompt-based scoring. | Six captures are present; finalize baseline adjudication before calculating a condition difference. |
+| 2 | Impact metric | Activity 1: 1/2 held-out correct. Activity 3: app 2/3 correct, 1 unfinished; baseline 0/3 correct. | Six held-out outcomes are scored; report the small groups descriptively, without causal or significance claims. |
 | 3 | Hypothesis | The case study and experiment specification describe progressive, error-specific hints and unaided transfer. | Present as a hypothesis, not a finding. |
 | 4 | Two named users | `Learning_OS_Hackathon_Submission_Final.docx`. | Present in the local/private submission with consent; names are omitted from this public case study. |
 | 5 | Contact artifact for each user | `person1ss.zip`, `person2ss.zip`, and timestamped screenshots. | Present locally; raw participant evidence is intentionally not committed publicly. |
@@ -98,13 +98,13 @@ The post-build activity includes six learners split across app and ordinary-chat
 
 | C7 evaluation criterion | What this package supports | Status |
 |---|---|---|
-| Six learners and a removal test against ordinary answer-giving AI | Post-build run split six learners 3/3 across conditions and includes six held-out captures. | Run evidenced. Complete the third baseline score and preserve the assignment details in the study record. |
+| Six learners and a removal test against ordinary answer-giving AI | Post-build run split six learners 3/3 across conditions and includes six held-out captures. | Run evidenced and all outcomes scored. Preserve participant condition/experience records alongside the result table. |
 | Human, probabilistic, deterministic architecture | Facilitator, model, and sandbox/evaluator responsibilities are separated in the product response above. | Addressed in the design; not evidence of efficacy. |
 | Product quality and learning | App logs show end-to-end runs and concrete usability/evaluator issues; those observations led to hint, contract, and validation changes. Some production workflows remain unverified. | Partial; report specific defects and avoid claiming a fully validated release. |
 
 ## Next evaluation
 
-Complete scoring for the current six-person removal run by recovering the course/enrollment baseline held-out prompt and expected contract, adjudicating all six result sets, and recording per-learner condition, task, correctness, attempts, time, and completion status. Preserve available experience-band and assignment details. Treat this sample as exploratory; a larger, matched follow-up would be needed for a stronger estimate.
+Present the six per-learner outcomes with condition, task, correctness, attempts, time, and completion status, alongside the held-out screenshots. Preserve experience-band and assignment details where available. Treat the current sample as exploratory; a larger, matched follow-up would be needed for a stronger estimate.
 
 ## Current project status
 
